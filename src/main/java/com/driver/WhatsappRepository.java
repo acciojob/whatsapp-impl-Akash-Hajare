@@ -12,9 +12,9 @@ public class WhatsappRepository {
     //You can use the below mentioned hashmaps or delete these and create your own.
     private HashMap<Group, List<User>> groupUserMap;
     private HashMap<Group, List<Message>> groupMessageMap;
-    private HashMap<Message, User> senderMap;
+    private HashMap<User, List<Message>> senderMap;
     private HashMap<Group, User> adminMap;
-    private HashSet<String> userMobile;
+   // private HashSet<String> userMobile;
     private HashMap<String,User> userData;
     private int customGroupCount;
     private int messageId;
@@ -22,9 +22,9 @@ public class WhatsappRepository {
     public WhatsappRepository(){
         this.groupMessageMap = new HashMap<Group, List<Message>>();
         this.groupUserMap = new HashMap<Group, List<User>>();
-        this.senderMap = new HashMap<Message, User>();
+        this.senderMap = new HashMap<User,List<Message>>();
         this.adminMap = new HashMap<Group, User>();
-        this.userMobile = new HashSet<>();
+        //this.userMobile = new HashSet<>();
         this.userData= new HashMap<>();
         this.customGroupCount = 0;
         this.messageId = 0;
@@ -57,7 +57,7 @@ public class WhatsappRepository {
     }
     public int createMessage(String content){
         this.messageId++;
-        Message message= new Message(messageId,content,new Date());
+        Message message= new Message(messageId,content);
         return this.messageId;
     }
 
@@ -74,6 +74,14 @@ public class WhatsappRepository {
 
         messages.add(message);
         groupMessageMap.put(group,messages);
+        //mapping user and their send messages
+       List<Message> messageList= new ArrayList<>();
+        if(senderMap.containsKey(sender)){
+            messageList=senderMap.get(sender);
+            messageList.add(message);
+        }
+       senderMap.put(sender,messageList);
+
         return messages.size();
     }
 
@@ -97,9 +105,46 @@ public class WhatsappRepository {
         return false;
     }
 
-//    public int removeUser(User user) throws Exception{
-//        return 0;
-//    }
+    public int removeUser(User user) throws Exception{
+        Set<Group> groups= groupUserMap.keySet();
+        boolean checkUser=false;
+        boolean checkAdmin=true;
+        Group userGroup=null;
+        for(Group group:groups){
+            if(this.userExistsInGroup(group,user)){
+                checkUser=true;
+                userGroup=group;
+                if(!adminMap.get(group).equals(user)){
+                    groupUserMap.get(group).remove(user);
+                    this.removeUserMessages(user,group);
+                    senderMap.remove(user);
+                    checkAdmin = false;
+                }
+            }
+        }
+        if(!checkUser) throw new Exception("User not found");
+        else if(checkAdmin) throw new Exception("Cannot remove admin");
+        else {
+            int numOfUsersInGroup=groupUserMap.get(userGroup).size();
+            int numOfMessagesInAllGroup=0;
+            Set<Group> groupSet=groupMessageMap.keySet();
+            for(Group group:groupSet){
+                numOfMessagesInAllGroup += groupMessageMap.get(group).size();
+            }
+            return numOfMessagesInAllGroup+numOfUsersInGroup;
+        }
+
+   }
+   public void removeUserMessages(User user,Group group){
+        List<Message> messages=senderMap.get(user);
+        //removing all its messages from group
+       for(Message message:messages){
+           groupMessageMap.get(group).remove(message);
+       }
+   }
+
+
+
 //    public String findMessage(Date start, Date end, int K) throws Exception{
 //        //This is a bonus problem and does not contains any marks
 //        // Find the Kth latest message between start and end (excluding start and end)
